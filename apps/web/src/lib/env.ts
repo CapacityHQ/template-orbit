@@ -48,11 +48,16 @@ export function assertProductionStartupAuthenticationConfigured(
   assertProductionAuthenticationConfigured({ ...environment, NODE_ENV: 'production' });
 }
 
-const serverEnvSchema = z.object({
+export const serverEnvSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(16),
   BETTER_AUTH_URL: z.url().default('http://localhost:3000'),
   NEXT_PUBLIC_APP_URL: z.url().default('http://localhost:3000'),
-  EMAIL_FROM: z.string().min(1).default('Orbit <auth@orbit.local>'),
+  EMAIL_FROM: z
+    .string()
+    .optional()
+    .transform((value) =>
+      value === undefined || value.trim().length === 0 ? 'Orbit <auth@orbit.local>' : value,
+    ),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
@@ -74,8 +79,14 @@ export function serverEnv(): ServerEnv {
   return cached;
 }
 
+export function inviteOnly(): boolean {
+  const value = process.env['ORBIT_INVITE_ONLY'];
+  return value === 'true' || value === '1';
+}
+
 export function signUpIsOpen(): boolean {
   return (
+    !inviteOnly() &&
     parseDomainList(process.env['ALLOWED_EMAIL_DOMAINS'], 'ALLOWED_EMAIL_DOMAINS').length === 0
   );
 }

@@ -20,6 +20,9 @@ export interface LoginFormProps {
   readonly passwordEnabled?: boolean;
   readonly emailEnabled?: boolean;
   readonly openSignUp?: boolean;
+  readonly initialEmail?: string;
+  readonly initialPassword?: string;
+  readonly inviteOnly?: boolean;
 }
 
 type Pending =
@@ -214,17 +217,19 @@ function LoginFooter({
   emailEnabled,
   creatingAccount,
   openSignUp,
+  inviteOnly,
   onToggleAccount,
 }: {
   readonly passwordEnabled: boolean;
   readonly emailEnabled: boolean;
   readonly creatingAccount: boolean;
   readonly openSignUp: boolean;
+  readonly inviteOnly: boolean;
   readonly onToggleAccount: () => void;
 }) {
   return (
     <>
-      {passwordEnabled ? (
+      {passwordEnabled && !inviteOnly ? (
         <button
           type="button"
           className="text-center text-muted text-xs underline-offset-2 hover:underline"
@@ -238,6 +243,11 @@ function LoginFooter({
           {emailEnabled
             ? 'New here? Signing in creates your account, then you set up a workspace.'
             : 'New here? Create an account with an available sign-in method, then set up a workspace.'}
+        </p>
+      ) : null}
+      {inviteOnly ? (
+        <p className="text-center text-2xs text-faint">
+          Orbit is invitation-only. Ask a workspace admin to invite you.
         </p>
       ) : null}
       <p className="text-center text-2xs text-faint">
@@ -264,10 +274,13 @@ export function LoginForm({
   passwordEnabled = false,
   emailEnabled = true,
   openSignUp = false,
+  initialEmail = '',
+  initialPassword = '',
+  inviteOnly = false,
 }: LoginFormProps) {
   const { toast } = useToast();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(initialEmail);
+  const [password, setPassword] = useState(initialPassword);
   const [otp, setOtp] = useState('');
   const [name, setName] = useState('');
   const [creatingAccount, setCreatingAccount] = useState(false);
@@ -498,6 +511,7 @@ export function LoginForm({
         emailEnabled={emailEnabled}
         creatingAccount={creatingAccount}
         openSignUp={openSignUp}
+        inviteOnly={inviteOnly}
         onToggleAccount={() => setCreatingAccount((current) => !current)}
       />
     </div>

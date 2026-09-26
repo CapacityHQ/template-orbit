@@ -105,7 +105,9 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
           {invite.role}. Sign in with that address and you will land back here.
         </p>
         <Button variant="primary" size="md" block asChild>
-          <Link href={`/login?next=${encodeURIComponent(`/invite/${token}`)}`}>
+          <Link
+            href={`/login?next=${encodeURIComponent(`/invite/${token}`)}&email=${encodeURIComponent(invite.email)}`}
+          >
             Sign in to continue
           </Link>
         </Button>

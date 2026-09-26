@@ -4,10 +4,11 @@ import {
   assertEmailDomainAllowed,
   ingestExternalAvatar,
   isExternalImageUrl,
+  pendingInvitesForEmail,
   publishSessionRevoked,
   redisRateLimitStorage,
 } from '@orbit/core';
-import { db, eq, inArray, schema } from '@orbit/db';
+import { db, eq, inArray, schema, sql } from '@orbit/db';
 import {
   assertEmailConfigured,
   resetPasswordEmail,
@@ -25,7 +26,7 @@ import { z } from 'zod';
 import { isDevLoginRequest } from '@/lib/api/dev-login.ts';
 import { deploymentAuthOptions } from '@/lib/auth/deployment.ts';
 import { organizationSessionPlugin } from '@/lib/auth/organization.ts';
-import { mcpServerUrl, serverEnv } from '@/lib/env.ts';
+import { inviteOnly, mcpServerUrl, serverEnv } from '@/lib/env.ts';
 import { uniqueHandleFor } from './handle.ts';
 import { hashPassword, verifyPassword } from './password.ts';
 
@@ -142,6 +143,7 @@ function emailAndPassword() {
   return {
     enabled: true,
     minPasswordLength: 12,
+    disableSignUp: inviteOnly(),
     sendResetPassword: async (
       { user, url, token }: { user: { email: string }; url: string; token: string },
       request?: Request,
@@ -180,6 +182,29 @@ function assertSignUpAllowed(email: string): void {
   }
 }
 
+const INVITATION_REQUIRED_MESSAGE =
+  'Orbit is invitation-only. Ask a workspace admin to invite you.';
+
+export async function assertInvited(email: string): Promise<void> {
+  if (!inviteOnly()) return;
+  if ((await pendingInvitesForEmail(email)).length > 0) return;
+  throw new APIError('FORBIDDEN', {
+    code: 'INVITATION_REQUIRED',
+    message: INVITATION_REQUIRED_MESSAGE,
+  });
+}
+
+export async function assertSignInCodeAllowed(email: string): Promise<void> {
+  if (!inviteOnly()) return;
+  const existing = await db
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(eq(sql`lower(${schema.user.email})`, email.toLowerCase()))
+    .limit(1);
+  if (existing.length > 0) return;
+  await assertInvited(email);
+}
+
 function signInCodeIdempotencyKey(email: string, otp: string): string {
   const digest = createHmac('sha256', serverEnv().BETTER_AUTH_SECRET)
     .update(`${email}:${otp}`)
@@ -211,12 +236,14 @@ export const auth = betterAuth({
     },
   },
   hooks: {
-    before: createAuthMiddleware((ctx) => {
+    before: createAuthMiddleware(async (ctx) => {
       if (ctx.path === SIGN_IN_CODE_PATH) {
         const parsed = signInCodeRequestSchema.safeParse(ctx.body);
-        if (parsed.success) assertSignUpAllowed(parsed.data.email);
+        if (parsed.success) {
+          assertSignUpAllowed(parsed.data.email);
+          await assertSignInCodeAllowed(parsed.data.email);
+        }
       }
-      return Promise.resolve();
     }),
     after: createAuthMiddleware(async (ctx) => {
       if (ctx.path === '/passkey/verify-authentication' && verificationSucceeded(ctx)) {
@@ -233,6 +260,7 @@ export const auth = betterAuth({
       create: {
         before: async (user) => {
           assertSignUpAllowed(user.email);
+          await assertInvited(user.email);
           return { data: { ...user, handle: await handleFor(user.email, user.name) } };
         },
         after: async (user) => {
@@ -267,6 +295,7 @@ export const auth = betterAuth({
         if (type !== 'sign-in') return;
         assertEmailConfigured();
         assertSignUpAllowed(email);
+        await assertSignInCodeAllowed(email);
         const content = await signInCodeEmail({ code: otp, email });
         await sendEmail(db, {
           to: email,

@@ -32,8 +32,8 @@
       "command": "node --env-file=.env --import tsx .capacity/ensure-bucket.ts"
     },
     {
-      "id": "seed",
-      "command": "node --env-file=.env --import tsx packages/db/src/seed/index.ts"
+      "id": "admin-account",
+      "command": "node --env-file=.env --import tsx .capacity/admin-account.ts"
     }
   ]
 }

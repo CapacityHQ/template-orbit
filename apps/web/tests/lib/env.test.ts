@@ -4,6 +4,7 @@ import {
   assertProductionAuthenticationConfigured,
   assertProductionStartupAuthenticationConfigured,
   githubConnectReady,
+  serverEnvSchema,
   slackConnectReady,
 } from '@/lib/env';
 import nextConfig from '../../next.config.ts';
@@ -46,6 +47,22 @@ describe('Slack connection readiness', () => {
       expect(slackConnectReady({ ...environment, [key]: '   ' })).toBe(false);
       expect(slackConnectReady({ ...environment, [key]: undefined })).toBe(false);
     }
+  });
+});
+
+describe('server environment', () => {
+  const secret = 'server-environment-secret';
+
+  it('gives a blank EMAIL_FROM the default sender, as when it is unset', () => {
+    for (const value of [undefined, '', '   ']) {
+      const parsed = serverEnvSchema.parse({ BETTER_AUTH_SECRET: secret, EMAIL_FROM: value });
+      expect(parsed.EMAIL_FROM).toBe('Orbit <auth@orbit.local>');
+    }
+    const configured = serverEnvSchema.parse({
+      BETTER_AUTH_SECRET: secret,
+      EMAIL_FROM: 'Orbit <orbit@example.com>',
+    });
+    expect(configured.EMAIL_FROM).toBe('Orbit <orbit@example.com>');
   });
 });
 
