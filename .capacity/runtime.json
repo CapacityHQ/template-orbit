@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "apps": [
+    {
+      "id": "web",
+      "name": "Orbit",
+      "primary": true,
+      "cwd": "apps/web",
+      "command": "node ../../.capacity/env-run.mjs ../../.env node node_modules/next/dist/bin/next dev --port 3000"
+    },
+    {
+      "id": "realtime",
+      "name": "Realtime",
+      "primary": false,
+      "cwd": "apps/web",
+      "command": "node --env-file=../../.env --import tsx src/realtime.ts"
+    }
+  ],
+  "services": [
+    {
+      "id": "infra",
+      "composeFile": ".capacity/compose.services.yaml"
+    }
+  ],
+  "setup": [
+    {
+      "id": "db-release",
+      "command": "node --env-file=.env --import tsx packages/db/src/migration-release.ts"
+    },
+    {
+      "id": "bucket",
+      "command": "node --env-file=.env --import tsx .capacity/ensure-bucket.ts"
+    },
+    {
+      "id": "seed",
+      "command": "node --env-file=.env --import tsx packages/db/src/seed/index.ts"
+    }
+  ]
+}

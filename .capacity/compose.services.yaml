@@ -1,0 +1,56 @@
+# Capacity Desktop starts this file with `docker compose up -d --wait` before
+# installing dependencies. Upstream's docker-compose.yml is the model (same
+# images, users, passwords and host ports, so .env.example needs no edits),
+# minus two things the desktop's runtime cannot use: MinIO, whose public images
+# were withdrawn from quay.io and Docker Hub (RustFS speaks the same S3 API and
+# accepts the same credentials), and the one-shot bucket container, which makes
+# `up --wait` fail on Compose v5 (exited(0) is not "running"); the bucket is
+# created by the `bucket` setup command in runtime.json instead.
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: orbit
+      POSTGRES_PASSWORD: orbit
+      POSTGRES_DB: orbit
+    ports:
+      - "5434:5432"
+    volumes:
+      - orbit_postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orbit -d orbit"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6380:6379"
+    volumes:
+      - orbit_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  storage:
+    image: rustfs/rustfs:1.0.0
+    environment:
+      RUSTFS_ACCESS_KEY: orbitminio
+      RUSTFS_SECRET_KEY: orbitminio
+      RUSTFS_VOLUMES: /data
+    ports:
+      - "9010:9000"
+      - "9011:9001"
+    volumes:
+      - orbit_storage:/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:9000/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  orbit_postgres:
+  orbit_redis:
+  orbit_storage:

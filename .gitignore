@@ -9,7 +9,6 @@ coverage/
 .env
 .env.local
 .env.*.local
-!.env.example
 
 uploads/
 /storage/
@@ -37,3 +36,4 @@ next-env.d.ts
 
 docs/.vitepress/cache/
 docs/.vitepress/dist/
+!.env.example
