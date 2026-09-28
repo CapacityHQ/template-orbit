@@ -152,8 +152,10 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
       <Shell title="Wrong account">
         <p className="text-muted text-xs">
           This invite was sent to <span className="text-text">{invite.email}</span>, but you are
-          signed in as <span className="text-text">{session.user.email}</span>. Sign out and sign
-          back in with the invited address.
+          signed in as <span className="text-text">{session.user.email}</span>.{' '}
+          {create
+            ? 'Sign out and create an account with the invited address.'
+            : 'Sign out and sign back in with the invited address.'}
         </p>
         <Button variant="secondary" size="md" block asChild>
           <Link href={loginHref(token, invite.email, { reauth: true, create })}>

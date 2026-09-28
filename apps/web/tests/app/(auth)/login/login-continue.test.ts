@@ -38,6 +38,23 @@ describe('safeCallback', () => {
     expect(safeCallback('https://evil.example')).toBeUndefined();
     expect(safeCallback('//evil.example')).toBeUndefined();
   });
+
+  it('refuses a path that browsers resolve to another host', () => {
+    expect(safeCallback('/\\evil.example')).toBeUndefined();
+    expect(safeCallback('/\\\\evil')).toBeUndefined();
+    expect(safeCallback('//evil')).toBeUndefined();
+    expect(safeCallback('/\t/evil.example')).toBeUndefined();
+    expect(safeCallback('/\n/evil.example')).toBeUndefined();
+    expect(safeCallback('/\r\\evil.example')).toBeUndefined();
+    expect(safeCallback('/\t\\evil.example')).toBeUndefined();
+    expect(safeCallback('/my-issues')).toBe('/my-issues');
+    expect(safeCallback('/invite/abc?x=1')).toBe('/invite/abc?x=1');
+    expect(safeCallback('/onboarding')).toBe('/onboarding');
+    expect(safeCallback('/oauth/authorize?consent_code=c&scope=openid+orbit.read')).toBe(
+      '/oauth/authorize?consent_code=c&scope=openid+orbit.read',
+    );
+    expect(safeCallback('/')).toBe('/');
+  });
 });
 
 describe('loginMode', () => {

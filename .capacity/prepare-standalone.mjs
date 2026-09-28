@@ -16,7 +16,9 @@ try {
 await mkdir(join(standalone, '.next'), { recursive: true });
 await cp(join(web, 'public'), join(standalone, 'public'), { recursive: true });
 await cp(join(web, '.next', 'static'), join(standalone, '.next', 'static'), { recursive: true });
-await cp(join(root, 'packages', 'db', 'drizzle'), join(standalone, 'migrations'), { recursive: true });
+await cp(join(root, 'packages', 'db', 'drizzle'), join(standalone, 'migrations'), {
+  recursive: true,
+});
 
 const banner = [
   "import { createRequire as __capacityCreateRequire } from 'node:module';",
@@ -52,5 +54,8 @@ const result = await build({
   define: { 'import.meta.main': 'false' },
   logLevel: 'warning',
 });
-if (result.errors.length > 0) throw new AggregateError(result.errors, 'Failed to bundle the entrypoints');
-console.info('Standalone prepared: start, realtime, scheduler, gateway and migrate bundles written.');
+if (result.errors.length > 0)
+  throw new AggregateError(result.errors, 'Failed to bundle the entrypoints');
+console.info(
+  'Standalone prepared: start, realtime, scheduler, gateway and migrate bundles written.',
+);

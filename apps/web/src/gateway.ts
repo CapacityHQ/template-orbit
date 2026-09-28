@@ -19,7 +19,8 @@ for (const host of (process.env['ORBIT_AUTH_ALLOWED_HOSTS'] ?? '').split(',')) {
   if (trimmed.length > 0) allowedOrigins.add(`${canonical.protocol}//${trimmed}`);
 }
 const cronSecret = process.env['CRON_SECRET']?.trim() ?? '';
-const schedulerEnabled = cronSecret.length > 0 && process.env['ORBIT_GATEWAY_SCHEDULER'] !== 'false';
+const schedulerEnabled =
+  cronSecret.length > 0 && process.env['ORBIT_GATEWAY_SCHEDULER'] !== 'false';
 const SHUTDOWN_CAP_MS = 25_000;
 const CHILD_KILL_AFTER_MS = 15_000;
 

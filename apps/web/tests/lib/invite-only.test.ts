@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createInvite } from '@orbit/core';
 import { createUser, createWorkspace, resetDatabase } from '@orbit/core/test-support';
-import { count, db, eq, schema } from '@orbit/db';
+import { and, count, db, eq, schema } from '@orbit/db';
 import { POST as authPost } from '@/app/api/auth/[...all]/route.ts';
 import { accountExists, canCreateWorkspace, hasAnyAccount } from '@/lib/auth/first-account.ts';
 import { hashPassword } from '@/lib/auth/password.ts';
@@ -18,14 +18,35 @@ const INVITATION_REQUIRED = /invitation-only/;
 const ROOT = resolve(import.meta.dir, '../../../..');
 const SIGN_UP_DISABLED = /EMAIL_PASSWORD_SIGN_UP_DISABLED/;
 const OWNER = 'owner@example.test';
+const INVITEE = 'invited@example.test';
 const PASSWORD = 'twelve-characters-long';
 
 let requestCookie = '';
-await restoreModulesAfterThisFile(['next/headers']);
+const cookiesSetByRoute = new Map<string, string>();
+const invitationEmails: { inviterName: string; organizationName: string }[] = [];
+await restoreModulesAfterThisFile(['next/headers', '@/lib/api/send-invite.ts']);
+const realSendInvite = { ...(await import('@/lib/api/send-invite.ts')) };
+mock.module('@/lib/api/send-invite.ts', () => ({
+  ...realSendInvite,
+  sendInviteEmail: ({ inviterName, organizationName }: (typeof invitationEmails)[number]) => {
+    invitationEmails.push({ inviterName, organizationName });
+    return Promise.resolve();
+  },
+}));
 mock.module('next/headers', () => ({
   headers: () => Promise.resolve(new Headers({ cookie: requestCookie })),
+  cookies: () =>
+    Promise.resolve({
+      set: (name: string, value: string) => {
+        cookiesSetByRoute.set(name, encodeURIComponent(value));
+      },
+    }),
 }));
 const { POST: setPassword } = await import('@/app/api/account/password/route.ts');
+const { PATCH: saveProfile } = await import('@/app/api/account/profile/route.ts');
+const { POST: createOrganization } = await import('@/app/api/organizations/route.ts');
+const { POST: sendInvites } = await import('@/app/api/invites/route.ts');
+const { POST: acceptInvitation } = await import('@/app/api/invites/[id]/accept/route.ts');
 
 async function withNativeFetchGlobals<T>(operation: () => Promise<T>): Promise<T> {
   const domFetchGlobals = {
@@ -127,6 +148,36 @@ function cookieOf(response: Response): string {
     .join('; ');
 }
 
+function cookieJar(cookie: string): Map<string, string> {
+  const pairs = cookie.split('; ').filter((pair) => pair.includes('='));
+  return new Map(
+    pairs.map((pair) => {
+      const at = pair.indexOf('=');
+      return [pair.slice(0, at), pair.slice(at + 1)];
+    }),
+  );
+}
+
+function withCookies(cookie: string, update: string): string {
+  const jar = cookieJar(cookie);
+  for (const [name, value] of cookieJar(update)) jar.set(name, value);
+  return [...jar].map(([name, value]) => `${name}=${value}`).join('; ');
+}
+
+function takeCookiesSetByRoute(): string {
+  const set = [...cookiesSetByRoute].map(([name, value]) => `${name}=${value}`).join('; ');
+  cookiesSetByRoute.clear();
+  return set;
+}
+
+function routeRequest(method: string, path: string, body: unknown): Request {
+  return new Request(`${APP_ORIGIN}${path}`, {
+    method,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 async function signUpByCode(
   email: string,
   password: string,
@@ -139,11 +190,7 @@ async function signUpByCode(
   const signIn = await authPost(authRequest('sign-in/email-otp', { email, otp }));
   requestCookie = cookieOf(signIn);
   const saved = await setPassword(
-    new Request(`${APP_ORIGIN}/api/account/password`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ newPassword: password }),
-    }),
+    routeRequest('POST', '/api/account/password', { newPassword: password }),
   );
   return { signIn, password: saved };
 }
@@ -152,6 +199,8 @@ describe('invitation-only sign-up, first account included', () => {
   beforeEach(async () => {
     await resetDatabase();
     requestCookie = '';
+    cookiesSetByRoute.clear();
+    invitationEmails.length = 0;
   });
 
   it('runs with the template defaults (the runner copies .env.example to .env)', () => {
@@ -300,6 +349,53 @@ describe('invitation-only sign-up, first account included', () => {
     }
   });
 
+  it('HTTP: once an owner exists, an invited address signs up by code, accepts, then signs in with its password', async () => {
+    const workspace = await createWorkspace('Nova');
+    const { invitation } = await createInvite(workspace.admin, {
+      email: INVITEE,
+      role: 'member',
+      teamIds: [workspace.teamId],
+    });
+    const consoleError = spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      await withNativeFetchGlobals(async () => {
+        const created = await signUpByCode(INVITEE, PASSWORD);
+        expect(created.signIn.status).toBe(200);
+        expect(created.password.status).toBe(200);
+        expect(await userCount()).toBe(2);
+        requestCookie = withCookies(requestCookie, takeCookiesSetByRoute());
+
+        const accepted = await acceptInvitation(
+          routeRequest('POST', `/api/invites/${invitation.id}/accept`, {}),
+          { params: Promise.resolve({ id: invitation.id }) },
+        );
+        expect(accepted.status).toBe(200);
+        expect(await accepted.json()).toEqual({
+          organizationId: workspace.organizationId,
+          alreadyAccepted: false,
+        });
+        const memberships = await db
+          .select({ role: schema.member.role })
+          .from(schema.member)
+          .innerJoin(schema.user, eq(schema.user.id, schema.member.userId))
+          .where(
+            and(
+              eq(schema.member.organizationId, workspace.organizationId),
+              eq(schema.user.email, INVITEE),
+            ),
+          );
+        expect(memberships).toEqual([{ role: 'member' }]);
+
+        const signedIn = await authPost(
+          authRequest('sign-in/email', { email: INVITEE, password: PASSWORD }),
+        );
+        expect(signedIn.status).toBe(200);
+      });
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it('HTTP: a Verify on an empty database is refused once another account exists, and the code is spent', async () => {
     const otp = await auth.api.createVerificationOTP({
       body: { email: 'late@example.test', type: 'sign-in' },
@@ -312,6 +408,49 @@ describe('invitation-only sign-up, first account included', () => {
     expect(await response.text()).toContain('INVITATION_REQUIRED');
     expect(await userCount()).toBe(1);
     expect(await verificationRows()).toBe(0);
+  });
+
+  it('HTTP: the name saved at onboarding reaches the session, and the invitation carries it', async () => {
+    const consoleError = spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      await withNativeFetchGlobals(async () => {
+        await signUpByCode(OWNER, PASSWORD);
+        requestCookie = withCookies(requestCookie, takeCookiesSetByRoute());
+        const saved = await saveProfile(
+          routeRequest('PATCH', '/api/account/profile', { name: 'Baptiste' }),
+        );
+        expect(saved.status).toBe(200);
+        requestCookie = withCookies(requestCookie, takeCookiesSetByRoute());
+        const session = await auth.api.getSession({
+          headers: new Headers({ cookie: requestCookie }),
+        });
+        expect(session?.user.name).toBe('Baptiste');
+
+        const created = await createOrganization(
+          routeRequest('POST', '/api/organizations', { name: 'Nova', slug: 'nova' }),
+        );
+        expect(created.status).toBe(200);
+        const { organization } = (await created.json()) as { organization: { id: string } };
+        const activated = await authPost(
+          authRequest(
+            'organization/set-active',
+            { organizationId: organization.id },
+            requestCookie,
+          ),
+        );
+        expect(activated.status).toBe(200);
+        requestCookie = withCookies(requestCookie, cookieOf(activated));
+        const invited = await withEmailConfigured(() =>
+          sendInvites(
+            routeRequest('POST', '/api/invites', { invites: [{ email: 'teammate@example.test' }] }),
+          ),
+        );
+        expect(invited.status).toBe(200);
+        expect(invitationEmails).toEqual([{ inviterName: 'Baptiste', organizationName: 'Nova' }]);
+      });
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it('only the oldest account may create a workspace while invitation-only is on', async () => {

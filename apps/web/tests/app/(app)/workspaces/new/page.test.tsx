@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it, mock } from 'bun:test';
-import { createUser, resetDatabase } from '@orbit/core/test-support';
+import { addMember, createUser, createWorkspace, resetDatabase } from '@orbit/core/test-support';
 import { render, screen } from '@testing-library/react';
 import { mockSession, restoreModulesAfterThisFile } from '../../../../../tests-support.ts';
 
@@ -36,7 +36,7 @@ describe('NewWorkspacePage', () => {
     await resetDatabase();
   });
 
-  it('shows the form to the oldest account and the invitation sentence to a later one', async () => {
+  it('shows the form to the oldest account and the invitation sentence to a later one with no workspace', async () => {
     const owner = await createUser('Owner');
     const second = await createUser('Second');
 
@@ -50,6 +50,19 @@ describe('NewWorkspacePage', () => {
       screen.getByText("You're not in a workspace yet. Ask an admin to invite you."),
     ).toBeVisible();
     expect(screen.getAllByRole('button', { name: 'Create workspace' })).toHaveLength(1);
+  });
+
+  it('tells a member of a workspace that only the person who set up this Orbit creates one', async () => {
+    const workspace = await createWorkspace('Nova');
+    userId = (await addMember(workspace, 'member')).user.id;
+    render(await NewWorkspacePage());
+    expect(
+      screen.getByText('Only the person who set up this Orbit can create workspaces.'),
+    ).toBeVisible();
+    expect(screen.queryByText("You're not in a workspace yet. Ask an admin to invite you.")).toBe(
+      null,
+    );
+    expect(screen.queryByRole('button', { name: 'Create workspace' })).toBe(null);
   });
 
   it('shows the form to anyone when invitation-only is off', async () => {

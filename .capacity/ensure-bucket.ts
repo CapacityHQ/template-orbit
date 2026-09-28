@@ -17,7 +17,10 @@ const client = new S3Client({
   region: process.env['S3_REGION']?.trim() || 'us-east-1',
   endpoint: need('S3_ENDPOINT'),
   forcePathStyle: process.env['S3_FORCE_PATH_STYLE']?.trim() !== 'false',
-  credentials: { accessKeyId: need('S3_ACCESS_KEY_ID'), secretAccessKey: need('S3_SECRET_ACCESS_KEY') },
+  credentials: {
+    accessKeyId: need('S3_ACCESS_KEY_ID'),
+    secretAccessKey: need('S3_SECRET_ACCESS_KEY'),
+  },
 });
 
 try {

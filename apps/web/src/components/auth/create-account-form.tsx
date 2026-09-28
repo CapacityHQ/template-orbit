@@ -104,6 +104,10 @@ function useCreateAccount(login: LoginFormProps): CreateAccountState {
       });
       if (result.error) throw new Error(result.error.message ?? 'Could not send the code.');
       setSent(true);
+      toast({
+        title: 'Check your email',
+        description: `We sent a 6-digit code to ${input.email}.`,
+      });
     });
 
   const verifyCode = () =>

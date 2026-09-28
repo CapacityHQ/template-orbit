@@ -82,6 +82,10 @@ describe('InvitePage', () => {
       'href',
       `/login?reauth=1&${encodedNext()}&email=invited%40example.test&create=1`,
     );
+    expect(
+      screen.getByText(/Sign out and create an account with the invited address\./),
+    ).toBeVisible();
+    expect(screen.queryByText(/sign back in/)).toBe(null);
 
     await invitedAccountExists();
     await renderPage();
@@ -89,6 +93,7 @@ describe('InvitePage', () => {
       'href',
       `/login?reauth=1&${encodedNext()}&email=invited%40example.test`,
     );
+    expect(screen.getByText(/Sign out and sign back in with the invited address\./)).toBeVisible();
   });
 
   it('never offers create=1 when invitation-only is off', async () => {

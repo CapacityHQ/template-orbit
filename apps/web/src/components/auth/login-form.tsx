@@ -265,7 +265,7 @@ function LoginFooter({
             : 'New here? Create an account with an available sign-in method, then set up a workspace.'}
         </p>
       ) : null}
-      {inviteOnly ? (
+      {inviteOnly && onCreateAccount === undefined ? (
         <p className="text-center text-2xs text-faint">
           Orbit is invitation-only. Ask a workspace admin to invite you.
         </p>

@@ -1,8 +1,8 @@
 import { emailSchema } from '@orbit/shared/validators';
+import { safeNextPath } from '@/lib/next-path.ts';
 
 export function safeCallback(value: string | string[] | undefined): string | undefined {
-  if (typeof value !== 'string') return undefined;
-  return /^\/(?!\/)/.test(value) ? value : undefined;
+  return safeNextPath(value) ?? undefined;
 }
 
 const MCP_AUTHORIZE_PARAMS = [

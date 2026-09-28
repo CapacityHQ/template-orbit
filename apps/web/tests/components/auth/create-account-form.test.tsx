@@ -51,6 +51,13 @@ mock.module('@/components/ui/toast.tsx', () => ({
 }));
 
 const { CreateAccountForm } = await import('../../../src/components/auth/create-account-form.tsx');
+const { LoginForm } = await import('../../../src/components/auth/login-form.tsx');
+
+const INVITE_ONLY_LINE = 'Orbit is invitation-only. Ask a workspace admin to invite you.';
+
+function codeSentToast(email: string) {
+  return { title: 'Check your email', description: `We sent a 6-digit code to ${email}.` };
+}
 
 function mockFetch(status: number, body: unknown): ReturnType<typeof mock> {
   const spy = mock(() => {
@@ -119,6 +126,8 @@ describe('CreateAccountForm', () => {
       email: 'owner@example.test',
       type: 'sign-in',
     });
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledWith(codeSentToast('owner@example.test'));
     expect(signInEmailOtp).toHaveBeenCalledWith({ email: 'owner@example.test', otp: '123456' });
     expect(getSession).toHaveBeenCalledWith({ query: { disableCookieCache: true } });
     const [url, init] = fetchSpy.mock.calls[0] as [string, { method: string; body: string }];
@@ -201,6 +210,11 @@ describe('CreateAccountForm', () => {
     await user.click(screen.getByRole('button', { name: 'Create account' }));
     await screen.findByLabelText('Sign in code');
     expect(screen.queryByText('Use another email')).toBeNull();
+    expect(toast).toHaveBeenCalledWith(codeSentToast('invited@example.test'));
+    await user.click(screen.getByRole('button', { name: 'Resend code' }));
+    await waitFor(() => expect(toast).toHaveBeenCalledTimes(2));
+    expect(toast).toHaveBeenNthCalledWith(2, codeSentToast('invited@example.test'));
+    expect(sendVerificationOtp).toHaveBeenCalledTimes(2);
     await user.type(screen.getByLabelText('Sign in code'), '123456');
     await user.click(screen.getByRole('button', { name: 'Verify' }));
     await waitFor(() => expect(assign).toHaveBeenCalledWith('/invite/tok'));
@@ -262,9 +276,63 @@ describe('CreateAccountForm', () => {
     await user.click(screen.getByRole('button', { name: 'Create account' }));
     await user.type(await screen.findByLabelText('Sign in code'), '123456');
     await user.click(screen.getByRole('button', { name: 'Verify' }));
-    await waitFor(() => expect(toast).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(toast).toHaveBeenCalledTimes(3));
+    expect(toast).toHaveBeenLastCalledWith({
+      title: 'Sign up failed',
+      description: 'Orbit is invitation-only. Ask a workspace admin to invite you.',
+      tone: 'danger',
+    });
     expect(screen.getByLabelText('Sign in code')).toBeVisible();
     expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('keeps Create account disabled until the password has 12 characters', async () => {
+    const user = userEvent.setup();
+    render(
+      <CreateAccountForm
+        mode="first-account"
+        lockEmail={false}
+        providers={[]}
+        passwordEnabled
+        emailEnabled
+      />,
+    );
+    await user.type(screen.getByLabelText('Email address'), 'owner@example.test');
+    await user.type(screen.getByLabelText('Password'), 'eleven-char');
+    expect(screen.getByRole('button', { name: 'Create account' })).toBeDisabled();
+    await user.type(screen.getByLabelText('Password'), 's');
+    expect(screen.getByRole('button', { name: 'Create account' })).toBeEnabled();
+  });
+
+  it('refuses an unverified session after Verify and sets no password', async () => {
+    const fetchSpy = mockFetch(200, { ok: true });
+    getSession.mockResolvedValue({ error: null, data: { user: { emailVerified: false } } });
+    const user = userEvent.setup();
+    render(
+      <CreateAccountForm
+        mode="first-account"
+        lockEmail={false}
+        providers={[]}
+        passwordEnabled
+        emailEnabled
+      />,
+    );
+    await user.type(screen.getByLabelText('Email address'), 'owner@example.test');
+    await createAccount(user);
+
+    await waitFor(() =>
+      expect(toast).toHaveBeenLastCalledWith({
+        title: 'Sign up failed',
+        description: 'Could not confirm your verified session. Sign in again.',
+        tone: 'danger',
+      }),
+    );
+    expect(getSession).toHaveBeenCalledWith({ query: { disableCookieCache: true } });
+    expect(order).toEqual(['send', 'verify']);
+    expect(listAccounts).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Sign in code')).toBeVisible();
   });
 
   it('switches to the sign-in form and back', async () => {
@@ -284,6 +352,29 @@ describe('CreateAccountForm', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Create your Orbit account',
     );
+  });
+
+  it('keeps the invitation-only line on the sign-in form alone', () => {
+    render(<LoginForm providers={[]} passwordEnabled emailEnabled inviteOnly />);
+    expect(screen.getByText(INVITE_ONLY_LINE)).toBeVisible();
+  });
+
+  it('drops the invitation-only line on the sign-in form it switches to', async () => {
+    const user = userEvent.setup();
+    render(
+      <CreateAccountForm
+        mode="first-account"
+        lockEmail={false}
+        providers={[]}
+        passwordEnabled
+        emailEnabled
+        inviteOnly
+      />,
+    );
+    await user.click(screen.getByText('I already have an account'));
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Sign in to Orbit');
+    expect(screen.getByText('Create an account')).toBeVisible();
+    expect(screen.queryByText(INVITE_ONLY_LINE)).toBeNull();
   });
 
   it('explains what to fill when email is not configured', () => {

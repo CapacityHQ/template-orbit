@@ -1,6 +1,6 @@
-import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterAll, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { createUser, resetDatabase } from '@orbit/core/test-support';
-import { mockSession } from '../../../../tests-support.ts';
+import { mockSession, restoreModulesAfterThisFile } from '../../../../tests-support.ts';
 
 let userId = '';
 
@@ -8,6 +8,9 @@ mockSession(() => ({
   user: { id: userId, name: 'Someone', email: 'someone@orbit.test' },
   session: { activeOrganizationId: null },
 }));
+
+await restoreModulesAfterThisFile(['next/headers']);
+mock.module('next/headers', () => ({ headers: () => Promise.resolve(new Headers()) }));
 
 const { POST } = await import('@/app/api/organizations/route.ts');
 

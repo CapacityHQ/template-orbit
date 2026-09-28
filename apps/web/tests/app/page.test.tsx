@@ -16,7 +16,7 @@ mock.module('next/navigation', () => ({
 }));
 
 const { default: HomePage } = await import('../../src/app/page.tsx');
-const { default: HomeLandingPage } = await import('../../src/app/home/page.tsx');
+const { default: HomeRedirectPage } = await import('../../src/app/home/page.tsx');
 
 describe('/ and /home', () => {
   beforeEach(() => {
@@ -27,7 +27,7 @@ describe('/ and /home', () => {
     await expect(HomePage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
       'redirect:/login',
     );
-    await expect(HomeLandingPage()).rejects.toThrow('redirect:/login');
+    await expect(HomeRedirectPage()).rejects.toThrow('redirect:/login');
   });
 
   it('keep an auth error code on the way to sign in', async () => {
@@ -41,6 +41,6 @@ describe('/ and /home', () => {
     await expect(HomePage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
       'redirect:/my-issues',
     );
-    await expect(HomeLandingPage()).rejects.toThrow('redirect:/my-issues');
+    await expect(HomeRedirectPage()).rejects.toThrow('redirect:/my-issues');
   });
 });

@@ -6,7 +6,7 @@
 import { spawn } from 'node:child_process';
 
 const [envFile, command, ...args] = process.argv.slice(2);
-if (!envFile || !command) {
+if (!(envFile && command)) {
   console.error('usage: node env-run.mjs <env file> <command> [args...]');
   process.exit(2);
 }
