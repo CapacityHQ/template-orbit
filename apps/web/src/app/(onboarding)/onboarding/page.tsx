@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { OnboardingFlow } from '@/features/onboarding/onboarding-flow.tsx';
 import type { OnboardingStatusView, PendingInviteView } from '@/features/onboarding/types.ts';
+import { canCreateWorkspace } from '@/lib/auth/first-account.ts';
 import { requireSession } from '@/lib/auth/session.ts';
 import { mcpServerUrl } from '@/lib/env.ts';
 import { safeNextPath } from '@/lib/next-path.ts';
@@ -30,6 +31,7 @@ export default async function OnboardingPage({
   const invites: PendingInviteView[] = session.user.emailVerified
     ? await pendingInvitesForEmail(status.email)
     : [];
+  const workspaceCreation = await canCreateWorkspace(session.user.id);
 
   const view: OnboardingStatusView = {
     name: status.name,
@@ -51,6 +53,7 @@ export default async function OnboardingPage({
       mcpUrl={mcpServerUrl()}
       emailEnabled={emailEnabled}
       emailVerificationRequired={!session.user.emailVerified}
+      canCreateWorkspace={workspaceCreation}
     />
   );
 }

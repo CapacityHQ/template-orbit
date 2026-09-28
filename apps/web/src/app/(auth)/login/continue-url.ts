@@ -1,3 +1,5 @@
+import { emailSchema } from '@orbit/shared/validators';
+
 export function safeCallback(value: string | string[] | undefined): string | undefined {
   if (typeof value !== 'string') return undefined;
   return /^\/(?!\/)/.test(value) ? value : undefined;
@@ -27,4 +29,21 @@ export function mcpContinueUrl(
     if (typeof value === 'string' && value.length > 0) search.set(key, value);
   }
   return `/api/auth/mcp/authorize?${search.toString()}`;
+}
+
+export type LoginMode = 'first-account' | 'invited' | 'sign-in';
+
+export function loginMode(
+  params: Record<string, string | string[] | undefined>,
+  state: { inviteOnly: boolean; hasAccounts: boolean },
+): LoginMode {
+  if (!state.inviteOnly) return 'sign-in';
+  if (!state.hasAccounts) return 'first-account';
+  return params['create'] === '1' ? 'invited' : 'sign-in';
+}
+
+export function invitedEmail(value: string | string[] | undefined): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const parsed = emailSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
 }

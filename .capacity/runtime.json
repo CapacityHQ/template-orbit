@@ -30,10 +30,6 @@
     {
       "id": "bucket",
       "command": "node --env-file=.env --import tsx .capacity/ensure-bucket.ts"
-    },
-    {
-      "id": "admin-account",
-      "command": "node --env-file=.env --import tsx .capacity/admin-account.ts"
     }
   ]
 }

@@ -37,6 +37,7 @@ export interface OnboardingFlowProps {
   readonly mcpUrl: string;
   readonly emailEnabled: boolean;
   readonly emailVerificationRequired: boolean;
+  readonly canCreateWorkspace?: boolean | undefined;
 }
 
 export function OnboardingFlow({
@@ -47,6 +48,7 @@ export function OnboardingFlow({
   mcpUrl,
   emailEnabled,
   emailVerificationRequired,
+  canCreateWorkspace = true,
 }: OnboardingFlowProps) {
   const [step, setStep] = useState<OnboardingStep>(initialStep);
   const reduceMotion = useReducedMotion();
@@ -130,7 +132,11 @@ export function OnboardingFlow({
                   to verify your email and see invitations.
                 </p>
               ) : null}
-              <WorkspaceStep invites={invites} onNext={onNext} />
+              <WorkspaceStep
+                invites={invites}
+                onNext={onNext}
+                canCreateWorkspace={canCreateWorkspace}
+              />
             </>
           ) : null}
           {step === 'invite' ? <InviteStep onNext={onNext} emailEnabled={emailEnabled} /> : null}

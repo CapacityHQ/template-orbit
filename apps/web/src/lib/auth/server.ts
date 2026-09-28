@@ -8,7 +8,7 @@ import {
   publishSessionRevoked,
   redisRateLimitStorage,
 } from '@orbit/core';
-import { db, eq, inArray, schema, sql } from '@orbit/db';
+import { db, eq, inArray, schema } from '@orbit/db';
 import {
   assertEmailConfigured,
   resetPasswordEmail,
@@ -25,6 +25,7 @@ import { emailOTP, mcp } from 'better-auth/plugins';
 import { z } from 'zod';
 import { isDevLoginRequest } from '@/lib/api/dev-login.ts';
 import { deploymentAuthOptions } from '@/lib/auth/deployment.ts';
+import { accountExists, hasAnyAccount } from '@/lib/auth/first-account.ts';
 import { organizationSessionPlugin } from '@/lib/auth/organization.ts';
 import { inviteOnly, mcpServerUrl, serverEnv } from '@/lib/env.ts';
 import { uniqueHandleFor } from './handle.ts';
@@ -187,6 +188,7 @@ const INVITATION_REQUIRED_MESSAGE =
 
 export async function assertInvited(email: string): Promise<void> {
   if (!inviteOnly()) return;
+  if (!(await hasAnyAccount())) return;
   if ((await pendingInvitesForEmail(email)).length > 0) return;
   throw new APIError('FORBIDDEN', {
     code: 'INVITATION_REQUIRED',
@@ -196,12 +198,7 @@ export async function assertInvited(email: string): Promise<void> {
 
 export async function assertSignInCodeAllowed(email: string): Promise<void> {
   if (!inviteOnly()) return;
-  const existing = await db
-    .select({ id: schema.user.id })
-    .from(schema.user)
-    .where(eq(sql`lower(${schema.user.email})`, email.toLowerCase()))
-    .limit(1);
-  if (existing.length > 0) return;
+  if (await accountExists(email)) return;
   await assertInvited(email);
 }
 

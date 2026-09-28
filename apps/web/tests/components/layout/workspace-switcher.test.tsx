@@ -78,6 +78,21 @@ describe('WorkspaceSwitcher', () => {
     expect(screen.getByTestId('create-workspace')).toBeInTheDocument();
   });
 
+  it('hides Create workspace from an account that may not create one', async () => {
+    render(
+      <WorkspaceSwitcher
+        workspace={NOVEUM}
+        workspaces={[NOVEUM]}
+        user={{ ...USER, canCreateWorkspace: false }}
+        collapsed={false}
+      />,
+    );
+    await openMenu();
+
+    expect(screen.queryByTestId('create-workspace')).toBeNull();
+    expect(screen.getByTestId('home-link')).toBeInTheDocument();
+  });
+
   it('sets the active organization and lands on that workspace when switching', async () => {
     setActive.mockResolvedValue({ error: null });
     const user = userEvent.setup();

@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { WorkspaceShell } from '@/components/layout/workspace-shell.tsx';
 import { IssueWorkspaceProvider } from '@/features/issues/workspace-provider.tsx';
+import { canCreateWorkspace } from '@/lib/auth/first-account.ts';
 import { resolveMembership } from '@/lib/auth/principal.ts';
 import { requireSession } from '@/lib/auth/session.ts';
 import type { ShellTeam, ShellWorkspace } from '@/lib/navigation.ts';
@@ -22,10 +23,11 @@ function realtimeUrl(): string {
 export default async function WorkspaceLayout({ children }: { children: ReactNode }) {
   const session = await requireSession();
 
-  const [onboarding, membership, organizations] = await Promise.all([
+  const [onboarding, membership, organizations, workspaceCreation] = await Promise.all([
     onboardingStatusFor(session.user.id),
     resolveMembership(session.user.id, session.session.activeOrganizationId ?? null),
     listOrganizationsForUser(session.user.id, { includeDeletingForAdmins: true }),
+    canCreateWorkspace(session.user.id),
   ]);
 
   if (!onboarding.completed) redirect('/onboarding');
@@ -59,6 +61,7 @@ export default async function WorkspaceLayout({ children }: { children: ReactNod
         name: session.user.name,
         email: session.user.email,
         image: session.user.image ?? null,
+        canCreateWorkspace: workspaceCreation,
       }}
       teams={teams}
     >

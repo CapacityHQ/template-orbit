@@ -1,6 +1,7 @@
 import { createOrganization, listOrganizationsForUser } from '@orbit/core';
-import { unauthorized } from '@orbit/shared/errors';
+import { forbidden, unauthorized } from '@orbit/shared/errors';
 import { handleRoute, publish, readJson } from '@/lib/api/handler.ts';
+import { canCreateWorkspace } from '@/lib/auth/first-account.ts';
 import { getSession } from '@/lib/auth/session.ts';
 
 export async function GET(): Promise<Response> {
@@ -23,6 +24,11 @@ export async function POST(request: Request): Promise<Response> {
   return await handleRoute(async () => {
     const session = await getSession();
     if (session === null) throw unauthorized();
+    if (!(await canCreateWorkspace(session.user.id))) {
+      throw forbidden(
+        'Only the person who set up this Orbit can create workspaces. Ask them to invite you.',
+      );
+    }
     const bootstrap = await createOrganization(session.user.id, await readJson(request), {
       seed: true,
     });

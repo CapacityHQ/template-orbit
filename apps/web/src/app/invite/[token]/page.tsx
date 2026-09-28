@@ -4,7 +4,9 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button.tsx';
 import { InviteAccept } from '@/features/settings/invite-accept.tsx';
+import { accountExists } from '@/lib/auth/first-account.ts';
 import { getSession } from '@/lib/auth/session.ts';
+import { inviteOnly } from '@/lib/env.ts';
 
 export const metadata: Metadata = { title: 'Join a workspace' };
 
@@ -46,6 +48,19 @@ function Shell({ title, children }: { title: string; children: ReactNode }) {
       </div>
     </main>
   );
+}
+
+function loginHref(
+  token: string,
+  email: string,
+  options: { reauth: boolean; create: boolean },
+): string {
+  const params = new URLSearchParams();
+  if (options.reauth) params.set('reauth', '1');
+  params.set('next', `/invite/${token}`);
+  params.set('email', email);
+  if (options.create) params.set('create', '1');
+  return `/login?${params.toString()}`;
 }
 
 export default async function InvitePage({ params }: { params: Promise<{ token: string }> }) {
@@ -96,6 +111,25 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   }
 
   const session = await getSession();
+  const stranger =
+    session === null || session.user.email.toLowerCase() !== invite.email.toLowerCase();
+  const create = stranger && inviteOnly() && !(await accountExists(invite.email));
+
+  if (session === null && create) {
+    return (
+      <Shell title={`Create your account to join ${invite.organizationName}`}>
+        <p className="text-muted text-xs">
+          This invite was sent to <span className="text-text">{invite.email}</span> as a{' '}
+          {invite.role}. Create your account with that address and you will land back here.
+        </p>
+        <Button variant="primary" size="md" block asChild>
+          <Link href={loginHref(token, invite.email, { reauth: false, create: true })}>
+            Create your account
+          </Link>
+        </Button>
+      </Shell>
+    );
+  }
 
   if (session === null) {
     return (
@@ -105,9 +139,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
           {invite.role}. Sign in with that address and you will land back here.
         </p>
         <Button variant="primary" size="md" block asChild>
-          <Link
-            href={`/login?next=${encodeURIComponent(`/invite/${token}`)}&email=${encodeURIComponent(invite.email)}`}
-          >
+          <Link href={loginHref(token, invite.email, { reauth: false, create: false })}>
             Sign in to continue
           </Link>
         </Button>
@@ -115,7 +147,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
     );
   }
 
-  if (session.user.email.toLowerCase() !== invite.email.toLowerCase()) {
+  if (stranger) {
     return (
       <Shell title="Wrong account">
         <p className="text-muted text-xs">
@@ -124,7 +156,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
           back in with the invited address.
         </p>
         <Button variant="secondary" size="md" block asChild>
-          <Link href={`/login?reauth=1&next=${encodeURIComponent(`/invite/${token}`)}`}>
+          <Link href={loginHref(token, invite.email, { reauth: true, create })}>
             Switch account
           </Link>
         </Button>

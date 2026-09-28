@@ -270,24 +270,31 @@ function JoinWorkspacePanel({
 export interface WorkspaceStepProps {
   readonly invites: readonly PendingInviteView[];
   readonly onNext: OnNext;
+  readonly canCreateWorkspace?: boolean | undefined;
 }
 
-export function WorkspaceStep({ invites, onNext }: WorkspaceStepProps) {
+const NO_WORKSPACE_YET = "You're not in a workspace yet. Ask an admin to invite you.";
+
+function titleFor(joining: boolean, canCreate: boolean): string {
+  if (joining) return 'Join your team';
+  return canCreate ? 'Create your workspace' : 'Your workspace';
+}
+
+export function WorkspaceStep({ invites, onNext, canCreateWorkspace = true }: WorkspaceStepProps) {
   const hasInvites = invites.length > 0;
   const [mode, setMode] = useState<'join' | 'create'>(hasInvites ? 'join' : 'create');
+  const joining = hasInvites && (mode === 'join' || !canCreateWorkspace);
 
   return (
     <div className="flex flex-col gap-6" data-testid="onboarding-workspace">
       <header className="flex flex-col gap-1">
-        <h1 className="font-semibold text-text text-xl">
-          {mode === 'join' ? 'Join your team' : 'Create your workspace'}
-        </h1>
+        <h1 className="font-semibold text-text text-xl">{titleFor(joining, canCreateWorkspace)}</h1>
         <p className="text-muted text-dense">
           A workspace holds your teams, issues, docs, and members.
         </p>
       </header>
 
-      {hasInvites ? (
+      {hasInvites && canCreateWorkspace ? (
         <fieldset className="flex gap-1 rounded-lg border border-border bg-surface p-1">
           <legend className="sr-only">Workspace mode</legend>
           <button
@@ -317,10 +324,10 @@ export function WorkspaceStep({ invites, onNext }: WorkspaceStepProps) {
         </fieldset>
       ) : null}
 
-      {mode === 'join' ? (
-        <JoinWorkspacePanel invites={invites} onNext={onNext} />
-      ) : (
-        <CreateWorkspacePanel onNext={onNext} />
+      {joining ? <JoinWorkspacePanel invites={invites} onNext={onNext} /> : null}
+      {!joining && canCreateWorkspace ? <CreateWorkspacePanel onNext={onNext} /> : null}
+      {joining || canCreateWorkspace ? null : (
+        <p className="text-muted text-dense">{NO_WORKSPACE_YET}</p>
       )}
     </div>
   );

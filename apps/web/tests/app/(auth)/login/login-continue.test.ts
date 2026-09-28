@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import { mcpContinueUrl, safeCallback } from '../../../../src/app/(auth)/login/continue-url.ts';
+import {
+  invitedEmail,
+  loginMode,
+  mcpContinueUrl,
+  safeCallback,
+} from '../../../../src/app/(auth)/login/continue-url.ts';
 
 describe('mcpContinueUrl', () => {
   it('rebuilds the authorize URL from a paused MCP request', () => {
@@ -32,5 +37,37 @@ describe('safeCallback', () => {
     expect(safeCallback('/settings')).toBe('/settings');
     expect(safeCallback('https://evil.example')).toBeUndefined();
     expect(safeCallback('//evil.example')).toBeUndefined();
+  });
+});
+
+describe('loginMode', () => {
+  it('is sign-in whenever invitation-only is off, whatever the URL says', () => {
+    expect(loginMode({ create: '1' }, { inviteOnly: false, hasAccounts: false })).toBe('sign-in');
+  });
+
+  it('is first-account on an empty database, invited with create=1, sign-in otherwise', () => {
+    expect(loginMode({}, { inviteOnly: true, hasAccounts: false })).toBe('first-account');
+    expect(loginMode({ create: '1' }, { inviteOnly: true, hasAccounts: false })).toBe(
+      'first-account',
+    );
+    expect(loginMode({ create: '1' }, { inviteOnly: true, hasAccounts: true })).toBe('invited');
+    expect(loginMode({}, { inviteOnly: true, hasAccounts: true })).toBe('sign-in');
+    expect(loginMode({ create: ['1'] }, { inviteOnly: true, hasAccounts: true })).toBe('sign-in');
+  });
+});
+
+describe('invitedEmail', () => {
+  it('accepts one address of at most 254 characters', () => {
+    expect(invitedEmail('a@b.test')).toBe('a@b.test');
+    expect(invitedEmail(['a@b.test'])).toBeUndefined();
+    expect(invitedEmail('not-an-address')).toBeUndefined();
+    expect(invitedEmail(`${'a'.repeat(250)}@b.test`)).toBeUndefined();
+  });
+
+  it('rejects what the shared email schema rejects and lowercases the address', () => {
+    expect(invitedEmail('@')).toBeUndefined();
+    expect(invitedEmail('a@')).toBeUndefined();
+    expect(invitedEmail('a b@c.test')).toBeUndefined();
+    expect(invitedEmail('A@B.test')).toBe('a@b.test');
   });
 });

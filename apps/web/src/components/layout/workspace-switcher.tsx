@@ -125,13 +125,15 @@ export function WorkspaceSwitcher({
             </DropdownMenuItem>
           );
         })}
-        <DropdownMenuItem
-          data-testid="create-workspace"
-          onSelect={() => router.push('/workspaces/new')}
-        >
-          <Plus className="size-4" aria-hidden="true" />
-          Create workspace
-        </DropdownMenuItem>
+        {user.canCreateWorkspace === false ? null : (
+          <DropdownMenuItem
+            data-testid="create-workspace"
+            onSelect={() => router.push('/workspaces/new')}
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            Create workspace
+          </DropdownMenuItem>
+        )}
 
         <DropdownMenuSeparator />
         <DropdownMenuItem data-testid="home-link" onSelect={() => router.push('/home')}>

@@ -37,6 +37,7 @@ export interface ShellUser {
   readonly name: string;
   readonly email: string;
   readonly image?: string | null | undefined;
+  readonly canCreateWorkspace?: boolean | undefined;
 }
 
 export interface NavLink {

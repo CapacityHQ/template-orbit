@@ -7,6 +7,13 @@
 > gateway `apps/web/src/gateway.ts`). The `bun` commands in the rest of this file are
 > upstream's contributor tooling and are not installed here; read `bun run <script>` as
 > the equivalent `pnpm run <script>` where the script does not itself start with `bun`.
+>
+> Sign-up is invitation-only (`ORBIT_INVITE_ONLY=true`). While the database has no account, the
+> first person to sign up creates it, and only that oldest account may create workspaces.
+> Everyone else joins by invitation, with an emailed 6-digit code, then a password.
+> `docs/first-run.md` and the README's demo sign-in describe upstream's open registration and
+> seeded users, not this template. Never run the demo seed (`packages/db/src/seed`): it deletes
+> every account.
 
 Free, realtime, keyboard-first task manager. The UX polish of the best paid task managers with the breadth of the open-source ones, plus docs, files, notifications, GitHub, and an MCP server. No pricing, no billing, no paid tiers anywhere.
 

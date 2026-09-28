@@ -21,8 +21,8 @@ export interface LoginFormProps {
   readonly emailEnabled?: boolean;
   readonly openSignUp?: boolean;
   readonly initialEmail?: string;
-  readonly initialPassword?: string;
   readonly inviteOnly?: boolean;
+  readonly onCreateAccount?: () => void;
 }
 
 type Pending =
@@ -166,10 +166,17 @@ interface OtpFieldsProps {
   readonly pending: boolean;
   readonly onChange: (value: string) => void;
   readonly onResend: () => void;
-  readonly onChangeEmail: () => void;
+  readonly onChangeEmail?: (() => void) | undefined;
 }
 
-function OtpFields({ sent, value, pending, onChange, onResend, onChangeEmail }: OtpFieldsProps) {
+export function OtpFields({
+  sent,
+  value,
+  pending,
+  onChange,
+  onResend,
+  onChangeEmail,
+}: OtpFieldsProps) {
   if (!sent) return null;
   return (
     <>
@@ -199,14 +206,16 @@ function OtpFields({ sent, value, pending, onChange, onResend, onChangeEmail }: 
         >
           Resend code
         </button>
-        <button
-          type="button"
-          className="text-muted underline-offset-2 hover:underline"
-          disabled={pending}
-          onClick={onChangeEmail}
-        >
-          Use another email
-        </button>
+        {onChangeEmail === undefined ? null : (
+          <button
+            type="button"
+            className="text-muted underline-offset-2 hover:underline"
+            disabled={pending}
+            onClick={onChangeEmail}
+          >
+            Use another email
+          </button>
+        )}
       </div>
     </>
   );
@@ -219,6 +228,7 @@ function LoginFooter({
   openSignUp,
   inviteOnly,
   onToggleAccount,
+  onCreateAccount,
 }: {
   readonly passwordEnabled: boolean;
   readonly emailEnabled: boolean;
@@ -226,6 +236,7 @@ function LoginFooter({
   readonly openSignUp: boolean;
   readonly inviteOnly: boolean;
   readonly onToggleAccount: () => void;
+  readonly onCreateAccount?: (() => void) | undefined;
 }) {
   return (
     <>
@@ -238,6 +249,15 @@ function LoginFooter({
           {creatingAccount ? 'I already have an account' : 'Create an account with a password'}
         </button>
       ) : null}
+      {onCreateAccount === undefined ? null : (
+        <button
+          type="button"
+          className="text-center text-muted text-xs underline-offset-2 hover:underline"
+          onClick={onCreateAccount}
+        >
+          Create an account
+        </button>
+      )}
       {openSignUp && !creatingAccount ? (
         <p className="text-center text-2xs text-faint">
           {emailEnabled
@@ -275,12 +295,12 @@ export function LoginForm({
   emailEnabled = true,
   openSignUp = false,
   initialEmail = '',
-  initialPassword = '',
   inviteOnly = false,
+  onCreateAccount,
 }: LoginFormProps) {
   const { toast } = useToast();
   const [email, setEmail] = useState(initialEmail);
-  const [password, setPassword] = useState(initialPassword);
+  const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [name, setName] = useState('');
   const [creatingAccount, setCreatingAccount] = useState(false);
@@ -513,6 +533,7 @@ export function LoginForm({
         openSignUp={openSignUp}
         inviteOnly={inviteOnly}
         onToggleAccount={() => setCreatingAccount((current) => !current)}
+        onCreateAccount={onCreateAccount}
       />
     </div>
   );
